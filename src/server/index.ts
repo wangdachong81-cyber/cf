@@ -185,17 +185,34 @@ const heartbeat = setInterval(() => {
     ws.ping();
   }
 }, 15000);
+let stopping = false;
+function onServerError(error: NodeJS.ErrnoException) {
+  if (stopping) return;
+  const port = process.env.PORT ?? 3001;
+  console.error(
+    error.code === "EADDRINUSE"
+      ? `[启动失败] 游戏服务端口 ${port} 已被占用。请停止旧服务，或使用 PORT=3002 指定其他端口。`
+      : `[游戏服务错误] ${error.message}`,
+  );
+  process.exitCode = 1;
+  stop();
+}
+// An attached WebSocketServer also forwards the HTTP server's listen errors.
+server.on("error", onServerError);
+wss.on("error", onServerError);
 server.listen(Number(process.env.PORT ?? 3001), "0.0.0.0", () =>
   console.log(
     `Arena server: http://localhost:${(server.address() as { port: number }).port}`,
   ),
 );
 function stop() {
+  if (stopping) return;
+  stopping = true;
   clearInterval(timer);
   clearInterval(heartbeat);
   for (const ws of clients.keys()) ws.terminate();
-  wss.close();
-  server.close();
+  wss.close(() => {});
+  server.close(() => {});
 }
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);
