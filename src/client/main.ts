@@ -26,7 +26,7 @@ const escape = (s: string) =>
 const storedName = localStorage.getItem("arena-name") ?? "";
 document.querySelector("#app")!.innerHTML = `
  <canvas id="world" aria-label="港区三维游戏场景"></canvas><div class="vignette"></div>
- <header class="masthead"><a class="brand" href="/" aria-label="几猫港区混战首页"><span class="brand-mark">几</span><span>几猫<span class="brand-sub">JIMAO / ARENA</span></span></a><div class="header-meta"><span class="live-dot"></span><span id="connection">PORT 07 · 多人竞技场</span><button id="sound" class="icon-button" title="切换音效">声音 开</button></div></header>
+ <header class="masthead"><a class="brand" href="/" aria-label="几猫港区混战首页"><span class="brand-mark">几</span><span>几猫<span class="brand-sub">JIMAO / ARENA</span></span></a><div class="header-meta"><span class="live-dot"></span><span id="connection">PORT 07 · 多人竞技场</span><label class="quality-control" for="quality">画质<select id="quality" aria-label="画质"><option value="low">低</option><option value="medium">中</option><option value="high" selected>高</option><option value="ultra">极高</option></select></label><button id="sound" class="icon-button" title="切换音效">声音 开</button></div></header>
  <main id="lobby">
   <div class="lobby-copy"><div class="eyebrow"><span></span> FREE FOR ALL / 个人混战</div><h1>港区<span>没有队友。</span></h1><p class="intro">穿过集装箱，听见下一声枪响。<br>随机入场，每个人都是你的对手。</p><div class="rules-strip"><div><b>08</b><span>参战席位</span></div><div><b>05<span> MIN</span></b><span>每局时长</span></div><div><b>20</b><span>击杀制胜</span></div></div><div class="scene-caption"><span>01 / DOCKYARD</span><span>港区货运场 · 自由交战区</span></div></div>
   <section class="entry-panel"><div class="panel-heading"><span class="eyebrow">DEPLOYMENT</span><span class="tiny">ONLINE PVP</span></div><h2>准备入场</h2><p class="panel-desc">呼叫朋友，或者先看看战局。</p>
@@ -50,9 +50,23 @@ document.querySelector("#app")!.innerHTML = `
   <div id="session-footer"><span id="session-status">正在同步</span><span id="network">— ms</span></div>
  </section><div id="toast" role="status"></div>
 `;
+function setEngineLoading(loading: boolean) {
+  $<HTMLButtonElement>("create").disabled = loading;
+  $<HTMLButtonElement>("join").disabled = loading;
+  $("entry-error").classList.toggle("loading", loading);
+}
 let view: ArenaView;
 try {
-  view = new ArenaView($<HTMLCanvasElement>("world"));
+  setEngineLoading(true);
+  view = await ArenaView.create($<HTMLCanvasElement>("world"), (text) => {
+    $("entry-error").textContent = text;
+  });
+  setEngineLoading(false);
+  $<HTMLSelectElement>("quality").value = view.quality;
+  $("quality").onchange = () =>
+    view.setQuality($<HTMLSelectElement>("quality").value);
+  $("entry-error").textContent = "";
+  if (import.meta.env.DEV) Object.assign(window, { __arena: view });
 } catch (error) {
   $("entry-error").textContent = "无法启动 WebGL，请启用浏览器硬件加速后刷新。";
   $("create").setAttribute("disabled", "");
@@ -84,6 +98,10 @@ let serverOffset = 0,
   lastFrame = performance.now(),
   busy = false,
   toastTimer = 0;
+view.onRecoil = (vertical, horizontal) => {
+  pitch = Math.min(1.45, pitch + vertical);
+  yaw += horizontal;
+};
 const now = () => Date.now() + serverOffset;
 const inGame = () =>
   !!self &&
@@ -125,11 +143,13 @@ function closeSession() {
   seenShots.clear();
   resetControls();
   if (locked()) document.exitPointerLock();
+  document.body.classList.remove("deployed");
   $("lobby").hidden = false;
   $("session").hidden = true;
   $("connection").textContent = "PORT 07 · 多人竞技场";
   $("ranking").classList.remove("expanded");
   setBusy(false);
+  view.setCombatState(undefined);
   view.sync([], "");
   void loadRooms();
 }
@@ -220,6 +240,7 @@ function connect(create: boolean) {
       setBusy(false);
       self = msg.id;
       role = msg.role;
+      document.body.classList.add("deployed");
       $("lobby").hidden = true;
       $("session").hidden = false;
       $("spectator").hidden = role !== "spectator";
@@ -285,6 +306,7 @@ function receive(state: Snapshot) {
     }
     lastHealth = me.health;
   }
+  view.setCombatState(me);
   view.sync(state.players, self);
   for (const shot of state.shots) {
     if (seenShots.has(shot.id)) continue;

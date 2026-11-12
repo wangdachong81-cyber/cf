@@ -1,3 +1,4 @@
+import originalMap from "./original/map.json";
 export const RULES = {
   tickRate: 30,
   maxPlayers: 8,
@@ -10,7 +11,7 @@ export const RULES = {
   speed: 6,
   sprintSpeed: 8.5,
   radius: 0.36,
-  eye: 1.6,
+  eye: 1.68,
   jumpSpeed: 6,
   gravity: 18,
   magazine: 30,
@@ -29,7 +30,14 @@ export const COLORS = [
   "#f0d778",
   "#85d4b1",
 ];
-export const ARENA_SIZE = 64;
+export const WORLD_BOUNDS = originalMap.bounds;
+export const WORLD_COLLIDERS = originalMap.colliders;
+export const WORLD_SEED = originalMap.seed;
+export const SPAWN_POINTS = originalMap.spawnPoints;
+export const ARENA_SIZE = Math.max(
+  WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX,
+  WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ,
+);
 export interface Block {
   x: number;
   z: number;
@@ -38,18 +46,19 @@ export interface Block {
   h: number;
   color: string;
 }
-export const BLOCKS: Block[] = [
-  { x: -19, z: -19, w: 12, d: 5, h: 3.2, color: "#456b69" },
-  { x: -3, z: -22, w: 5, d: 12, h: 3.2, color: "#986344" },
-  { x: 15, z: -20, w: 12, d: 5, h: 3.2, color: "#626b58" },
-  { x: 22, z: -6, w: 5, d: 12, h: 3.2, color: "#466575" },
-  { x: 18, z: 13, w: 12, d: 5, h: 3.2, color: "#986344" },
-  { x: 1, z: 21, w: 5, d: 12, h: 3.2, color: "#456b69" },
-  { x: -17, z: 20, w: 12, d: 5, h: 3.2, color: "#626b58" },
-  { x: -23, z: 3, w: 5, d: 12, h: 3.2, color: "#986344" },
-  { x: -7, z: -5, w: 9, d: 4, h: 3.2, color: "#466575" },
-  { x: 7, z: 6, w: 9, d: 4, h: 3.2, color: "#456b69" },
-  { x: 10, z: -7, w: 3, d: 3, h: 1.4, color: "#9d8864" },
-  { x: -9, z: 8, w: 3, d: 3, h: 1.4, color: "#9d8864" },
-  { x: -1, z: 1, w: 2.5, d: 2.5, h: 1.4, color: "#9d8864" },
-];
+// The spectator map projects the exact same colliders used by the server.
+export const BLOCKS: Block[] = WORLD_COLLIDERS.filter(
+  (b) => !b.bulletOnly && b.min[1] < 1.8 && b.max[1] > 0.42,
+).map((b) => ({
+  x: (b.min[0] + b.max[0]) / 2,
+  z: (b.min[2] + b.max[2]) / 2,
+  w: b.max[0] - b.min[0],
+  d: b.max[2] - b.min[2],
+  h: b.max[1] - b.min[1],
+  color:
+    b.surface === "metal"
+      ? "#5a7373"
+      : b.surface === "wood"
+        ? "#927e5d"
+        : "#6b7469",
+}));

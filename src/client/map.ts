@@ -1,4 +1,4 @@
-import { ARENA_SIZE, BLOCKS } from "../shared/config";
+import { BLOCKS, WORLD_BOUNDS } from "../shared/config";
 import type { Player } from "../shared/protocol";
 export function drawMap(
   canvas: HTMLCanvasElement,
@@ -21,29 +21,36 @@ export function drawMap(
   if (!w || !h) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  const size = Math.min(w, h) - 64,
-    scale = size / ARENA_SIZE,
-    ox = (w - size) / 2,
-    oy = (h - size) / 2;
-  const X = (x: number) => ox + (x + ARENA_SIZE / 2) * scale,
-    Z = (z: number) => oy + (z + ARENA_SIZE / 2) * scale;
+  const width = WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX,
+    height = WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ;
+  const scale = Math.min((w - 64) / width, (h - 64) / height);
+  const mapWidth = width * scale,
+    mapHeight = height * scale;
+  const ox = (w - mapWidth) / 2,
+    oy = (h - mapHeight) / 2;
+  const X = (x: number) => ox + (x - WORLD_BOUNDS.minX) * scale;
+  const Z = (z: number) => oy + (z - WORLD_BOUNDS.minZ) * scale;
   ctx.fillStyle = "#182322";
-  ctx.fillRect(ox, oy, size, size);
+  ctx.fillRect(ox, oy, mapWidth, mapHeight);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(ox, oy, mapWidth, mapHeight);
+  ctx.clip();
   ctx.strokeStyle = "#293b36";
   ctx.lineWidth = 1;
   for (let n = 0; n <= 8; n++) {
     ctx.beginPath();
-    ctx.moveTo(ox + (n * size) / 8, oy);
-    ctx.lineTo(ox + (n * size) / 8, oy + size);
-    ctx.moveTo(ox, oy + (n * size) / 8);
-    ctx.lineTo(ox + size, oy + (n * size) / 8);
+    ctx.moveTo(ox + (n * mapWidth) / 8, oy);
+    ctx.lineTo(ox + (n * mapWidth) / 8, oy + mapHeight);
+    ctx.moveTo(ox, oy + (n * mapHeight) / 8);
+    ctx.lineTo(ox + mapWidth, oy + (n * mapHeight) / 8);
     ctx.stroke();
   }
   ctx.setLineDash([4, 5]);
   ctx.strokeStyle = "#8d8964";
   ctx.beginPath();
   ctx.moveTo(X(0), oy + 5);
-  ctx.lineTo(X(0), oy + size - 5);
+  ctx.lineTo(X(0), oy + mapHeight - 5);
   ctx.stroke();
   ctx.setLineDash([]);
   for (const b of BLOCKS) {
@@ -59,21 +66,22 @@ export function drawMap(
       b.d * scale,
     );
   }
+  ctx.restore();
   ctx.strokeStyle = "#a8ad8b";
-  ctx.strokeRect(ox, oy, size, size);
+  ctx.strokeRect(ox, oy, mapWidth, mapHeight);
   ctx.fillStyle = "#8b9c91";
   ctx.font = "10px monospace";
   ctx.fillText("N ↑", ox, oy - 12);
   for (let i = 0; i < 8; i++) {
     ctx.fillText(
       String(i + 1).padStart(2, "0"),
-      ox + (i * size) / 8 + 4,
-      oy + size + 16,
+      ox + (i * mapWidth) / 8 + 4,
+      oy + mapHeight + 16,
     );
     ctx.fillText(
       String.fromCharCode(65 + i),
       ox - 16,
-      oy + (i * size) / 8 + 14,
+      oy + (i * mapHeight) / 8 + 14,
     );
   }
   for (const p of players) {

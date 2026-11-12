@@ -1,31 +1,62 @@
-import { ARENA_SIZE, BLOCKS, RULES } from "./config";
+import { Vector3 } from "three";
+import { RULES, WORLD_BOUNDS, WORLD_COLLIDERS } from "./config";
+import { createPhysics } from "./original/physics.js";
 import type { Body, Input } from "./protocol";
+export const worldPhysics = createPhysics({});
+for (const { min, max, ...options } of WORLD_COLLIDERS)
+  worldPhysics.addBox(min, max, options);
+worldPhysics.build();
+const position = new Vector3(),
+  velocity = new Vector3();
+export function groundAt(x: number, z: number, maxY = 0.42) {
+  return worldPhysics.groundHeight(x, z, maxY);
+}
 export function freeAt(x: number, z: number, r: number = RULES.radius) {
-  const edge = ARENA_SIZE / 2 - r;
-  return (
-    Math.abs(x) <= edge &&
-    Math.abs(z) <= edge &&
-    !BLOCKS.some(
-      (b) => Math.abs(x - b.x) < b.w / 2 + r && Math.abs(z - b.z) < b.d / 2 + r,
-    )
+  if (
+    x < WORLD_BOUNDS.minX + r ||
+    x > WORLD_BOUNDS.maxX - r ||
+    z < WORLD_BOUNDS.minZ + r ||
+    z > WORLD_BOUNDS.maxZ - r
+  )
+    return false;
+  if (!worldPhysics.nav.isWalkable(x, z)) return false;
+  const floor = groundAt(x, z);
+  return !worldPhysics.boxes.some(
+    (b) =>
+      !b.bulletOnly &&
+      b.max.y > floor + 0.42 &&
+      b.min.y < floor + 1.8 &&
+      x > b.min.x - r &&
+      x < b.max.x + r &&
+      z > b.min.z - r &&
+      z < b.max.z + r,
   );
 }
 export function move(body: Body, input: Input, dt: number) {
-  const length = Math.hypot(input.forward, input.strafe) || 1;
+  const length = Math.max(1, Math.hypot(input.forward, input.strafe));
   const speed = input.sprint ? RULES.sprintSpeed : RULES.speed;
-  const f = input.forward / Math.max(1, length),
-    s = input.strafe / Math.max(1, length);
-  const dx = (Math.cos(input.yaw) * s - Math.sin(input.yaw) * f) * speed * dt;
-  const dz = (-Math.sin(input.yaw) * s - Math.cos(input.yaw) * f) * speed * dt;
-  if (freeAt(body.x + dx, body.z)) body.x += dx;
-  if (freeAt(body.x, body.z + dz)) body.z += dz;
-  if (input.jump && body.y <= 0) body.vy = RULES.jumpSpeed;
-  body.vy -= RULES.gravity * dt;
-  body.y += body.vy * dt;
-  if (body.y < 0) {
-    body.y = 0;
-    body.vy = 0;
-  }
+  const f = input.forward / length,
+    s = input.strafe / length;
+  position.set(body.x, body.y, body.z);
+  const floor = groundAt(body.x, body.z, body.y + 0.05);
+  let vy = body.vy;
+  if (input.jump && body.y <= floor + 0.05 && vy <= 0) vy = RULES.jumpSpeed;
+  velocity.set(
+    (Math.cos(input.yaw) * s - Math.sin(input.yaw) * f) * speed,
+    vy - RULES.gravity * dt,
+    (-Math.sin(input.yaw) * s - Math.cos(input.yaw) * f) * speed,
+  );
+  worldPhysics.moveCapsule(position, velocity, dt, RULES.radius, 1.8, true);
+  body.x = Math.max(
+    WORLD_BOUNDS.minX + RULES.radius,
+    Math.min(WORLD_BOUNDS.maxX - RULES.radius, position.x),
+  );
+  body.z = Math.max(
+    WORLD_BOUNDS.minZ + RULES.radius,
+    Math.min(WORLD_BOUNDS.maxZ - RULES.radius, position.z),
+  );
+  body.y = position.y;
+  body.vy = velocity.y;
 }
 export function direction(
   yaw: number,
@@ -59,37 +90,10 @@ export function rayBox(
   return far < 0 ? Infinity : near;
 }
 export function wallDistance(origin: number[], dir: number[]) {
-  let distance: number = RULES.range;
-  for (const b of BLOCKS)
-    distance = Math.min(
-      distance,
-      rayBox(
-        origin,
-        dir,
-        [b.x - b.w / 2, 0, b.z - b.d / 2],
-        [b.x + b.w / 2, b.h, b.z + b.d / 2],
-      ),
-    );
-  // Match the visible perimeter fence collision.
-  const wall = ARENA_SIZE / 2;
-  for (const [min, max] of [
-    [
-      [-wall - 1, 0, -wall - 1],
-      [-wall, 5, wall + 1],
-    ],
-    [
-      [wall, 0, -wall - 1],
-      [wall + 1, 5, wall + 1],
-    ],
-    [
-      [-wall, 0, -wall - 1],
-      [wall, 5, -wall],
-    ],
-    [
-      [-wall, 0, wall],
-      [wall, 5, wall + 1],
-    ],
-  ])
-    distance = Math.min(distance, rayBox(origin, dir, min, max));
-  return distance;
+  const hit = worldPhysics.raycast(
+    new Vector3(...origin),
+    new Vector3(...dir),
+    RULES.range,
+  );
+  return hit?.dist ?? RULES.range;
 }

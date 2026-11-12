@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { COLORS, RULES } from "../shared/config";
+import { COLORS, RULES, WORLD_BOUNDS, SPAWN_POINTS } from "../shared/config";
 import {
   direction,
   freeAt,
+  groundAt,
   move,
   rayBox,
   wallDistance,
@@ -104,10 +105,17 @@ export class Room {
     }
   }
   spawn(p: Player, now: number) {
-    let best = { x: 0, z: 0, score: -Infinity };
+    const fallback = SPAWN_POINTS.find(([x, , z]) => freeAt(x, z, 1)) ?? [
+      -32, 0, 6,
+    ];
+    let best = { x: fallback[0], z: fallback[2], score: -Infinity };
     for (let i = 0; i < 160; i++) {
-      const x = (Math.random() - 0.5) * 58,
-        z = (Math.random() - 0.5) * 58;
+      const x =
+          WORLD_BOUNDS.minX +
+          Math.random() * (WORLD_BOUNDS.maxX - WORLD_BOUNDS.minX),
+        z =
+          WORLD_BOUNDS.minZ +
+          Math.random() * (WORLD_BOUNDS.maxZ - WORLD_BOUNDS.minZ);
       if (!freeAt(x, z, 1)) continue;
       const others = this.players.filter((o) => o.id !== p.id && o.health > 0);
       const score = others.length
@@ -118,7 +126,7 @@ export class Room {
     Object.assign(p, {
       x: best.x,
       z: best.z,
-      y: 0,
+      y: groundAt(best.x, best.z),
       vy: 0,
       yaw: Math.atan2(best.x, best.z),
       pitch: 0,

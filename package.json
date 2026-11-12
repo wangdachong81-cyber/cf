@@ -8,15 +8,19 @@
     "build": "tsc --noEmit && vite build && esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-server/index.js",
     "start": "node dist-server/index.js",
     "test": "tsx --test tests/*.test.ts",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "import:original": "node scripts/extract-original.mjs && node scripts/bake-original-map.mjs",
+    "test:browser": "tsx scripts/verify-browser.mjs"
   },
   "dependencies": {
-    "three": "^0.181.0",
+    "three": "0.180.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^1.1.1",
+    "@playwright/test": "^1.65.0",
     "@types/node": "^24.0.0",
-    "@types/three": "^0.181.0",
+    "@types/three": "0.180.0",
     "@types/ws": "^8.18.1",
     "concurrently": "^9.2.1",
     "esbuild": "^0.25.12",

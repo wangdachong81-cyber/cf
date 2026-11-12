@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Room } from "../src/server/game";
-import { RULES } from "../src/shared/config";
+import { RULES, WORLD_BOUNDS } from "../src/shared/config";
 import { direction, freeAt, move, wallDistance } from "../src/shared/physics";
 import type { Input } from "../src/shared/protocol";
 const input = (extra: Partial<Input> = {}): Input => ({
@@ -23,14 +23,14 @@ function duel() {
     b = r.add("乙", "player", time);
   r.tick(time);
   Object.assign(a.player!, {
-    x: -15,
-    z: 5,
+    x: -36,
+    z: -10,
     y: 0,
     yaw: 0,
     pitch: 0,
     protectedUntil: 0,
   });
-  Object.assign(b.player!, { x: -15, z: -5, y: 0, protectedUntil: 0 });
+  Object.assign(b.player!, { x: -36, z: -16, y: 0, protectedUntil: 0 });
   return { r, a, b };
 }
 test("random spawn positions are navigable and keep distinct colors; spectator does not consume a slot", () => {
@@ -78,12 +78,12 @@ test("spawn protection prevents damage and ends when shooting", () => {
 });
 test("container occlusion blocks shots", () => {
   const { r, a, b } = duel();
-  Object.assign(a.player!, { x: -7, z: 1 });
-  Object.assign(b.player!, { x: -7, z: -12 });
+  Object.assign(a.player!, { x: -22, z: -2 });
+  Object.assign(b.player!, { x: -22, z: -8 });
   r.fire(a, time + 3000);
   assert.equal(b.player!.health, 100);
   assert.equal(r.shots.at(-1)!.hit, null);
-  assert.ok(wallDistance([-7, 1.6, 1], direction(0, 0)) < 6);
+  assert.ok(wallDistance([-22, RULES.eye, -2], direction(0, 0)) < 6);
 });
 test("input flooding does not increase movement speed; invalid inputs ignored", () => {
   const { r, a } = duel();
@@ -110,17 +110,19 @@ test("reload locks firing; replenishes magazine after timer", () => {
   assert.equal(a.player!.reloadAt, 0);
 });
 test("collision, diagonal movement, and jumping follow shared movement rules", () => {
-  const a = { x: -15, y: 0, z: 5, vy: 0 },
+  const a = { x: -36, y: 0, z: -10, vy: 0 },
     b = { ...a };
   move(a, input({ forward: 1 }), 0.1);
   move(b, input({ forward: 1, strafe: 1 }), 0.1);
   assert.ok(
-    Math.abs(Math.hypot(b.x + 15, b.z - 5) - Math.hypot(a.x + 15, a.z - 5)) <
+    Math.abs(Math.hypot(b.x + 36, b.z + 10) - Math.hypot(a.x + 36, a.z + 10)) <
       1e-8,
   );
-  const c = { x: 31.5, y: 0, z: 0, vy: 0 };
-  move(c, input({ strafe: 1 }), 0.1);
-  assert.equal(c.x, 31.5);
+  const edge = { x: WORLD_BOUNDS.maxX - RULES.radius, y: 0, z: -28, vy: 0 };
+  move(edge, input({ strafe: 1 }), 0.1);
+  assert.ok(edge.x <= WORLD_BOUNDS.maxX - RULES.radius);
+  const c = { x: -36, y: 0, z: -10, vy: 0 };
+
   move(c, input({ jump: true }), 1 / 30);
   assert.ok(c.y > 0);
   for (let n = 0; n < 60; n++) move(c, input(), 1 / 30);
@@ -148,4 +150,18 @@ test("departures and round transitions do not retain orphan players", () => {
   r.remove(a.id);
   assert.equal(r.players.length, 0);
   assert.equal(r.endAt, 0);
+});
+
+test("original stairs lead onto the elevated container walkway", () => {
+  const body = { x: -2.2, z: 12.4, y: 0, vy: 0 };
+  for (let tick = 0; tick < 90; tick++)
+    move(body, input({ forward: 1, yaw: -Math.PI / 2 }), 1 / 30);
+  assert.ok(
+    body.x > 10,
+    "Player should walk along the original stair and roof route",
+  );
+  assert.ok(
+    Math.abs(body.y - 2.59) < 0.02,
+    "Player must stand on the visible original walkway, rather than underneath it",
+  );
 });
