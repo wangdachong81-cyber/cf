@@ -1,5 +1,8 @@
 {
-  "name": "jimao-arena", "version": "0.1.0", "private": true, "type": "module",
+  "name": "jimao-arena",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
   "scripts": {
     "dev": "concurrently -k -n server,client \"tsx watch src/server/index.ts\" \"vite --host 0.0.0.0\"",
     "build": "tsc --noEmit && vite build && esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist-server/index.js",
@@ -7,7 +10,21 @@
     "test": "tsx --test tests/*.test.ts",
     "check": "tsc --noEmit"
   },
-  "dependencies": { "three": "^0.181.0", "ws": "^8.18.3" },
-  "devDependencies": { "@types/node": "^24.0.0", "@types/three": "^0.181.0", "@types/ws": "^8.18.1", "concurrently": "^9.2.1", "esbuild": "^0.25.12", "tsx": "^4.20.6", "typescript": "^5.9.3", "vite": "^7.2.2" },
-  "engines": { "node": ">=22.12.0" }
+  "dependencies": {
+    "three": "^0.181.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/three": "^0.181.0",
+    "@types/ws": "^8.18.1",
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.25.12",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }
