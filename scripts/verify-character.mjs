@@ -71,6 +71,30 @@ try {
     await page.waitForTimeout(800);
     await page.screenshot({ path: `artifacts/character-${angle}.png` });
   }
+  await page.evaluate(() => {
+    const view = window.__arena;
+    window.portrait.yaw = Math.PI / 2;
+    view.sync([window.portrait], "viewer");
+    const frame = Object.getPrototypeOf(view).frame.bind(view);
+    view.frame = (dt) => {
+      frame(
+        dt,
+        0,
+        { x: -30.7, y: -0.38, z: 6, vy: 0 },
+        -Math.PI / 2,
+        -0.12,
+        false,
+        false,
+      );
+      view.context.weapon.root.visible = false;
+      view.context.render.frame(dt);
+    };
+  });
+  await page.waitForTimeout(800);
+  await page.screenshot({
+    path: "artifacts/character-detail.png",
+    clip: { x: 380, y: 100, width: 680, height: 850 },
+  });
   const animation = await page.evaluate(() => {
     const view = window.__arena,
       actor = view.actors.get("portrait");
@@ -91,10 +115,22 @@ try {
   assert.ok(animation.reload < 0);
   const metrics = await page.evaluate(() => {
     const actor = window.__arena.actors.get("portrait");
-    const model = { meshes: 0, triangles: 0, bodyColors: [], bounds: null };
+    const model = {
+      meshes: 0,
+      triangles: 0,
+      bodyColors: [],
+      skinned: 0,
+      bones: 0,
+      materialGroups: 0,
+    };
     actor.traverse((o) => {
       if (o.isMesh) {
         model.meshes++;
+        if (o.isSkinnedMesh) {
+          model.skinned++;
+          model.bones = o.skeleton.bones.length;
+          model.materialGroups = o.geometry.groups.length;
+        }
         model.triangles +=
           (o.geometry.index?.count ?? o.geometry.attributes.position.count) / 3;
         if (o.material.color)
@@ -104,6 +140,9 @@ try {
     return model;
   });
   assert.ok(metrics.triangles > 20000);
+  assert.equal(metrics.skinned, 1);
+  assert.ok(metrics.bones >= 10);
+  assert.ok(metrics.materialGroups <= 12);
   assert.ok(
     metrics.meshes < 70,
     "Static parts should batch by material, preserving animation joints",
@@ -113,6 +152,8 @@ try {
     JSON.stringify(
       {
         meshes: metrics.meshes,
+        bones: metrics.bones,
+        materialGroups: metrics.materialGroups,
         triangles: metrics.triangles,
         colors: [...new Set(metrics.bodyColors)],
         errors,

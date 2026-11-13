@@ -166,7 +166,7 @@ export class ArenaView {
     context.weapon = await createWeapon(context);
     context.weapon.debug.noFire = true;
     context.weapon.setVisible(false);
-    view.characters = new CharacterFactory();
+    view.characters = new CharacterFactory(context.mats);
     progress("正在编译原版场景着色器…");
     await context.render.onLevelReady();
     return view;
