@@ -95,6 +95,39 @@ try {
     path: "artifacts/character-detail.png",
     clip: { x: 380, y: 100, width: 680, height: 850 },
   });
+  await page.evaluate(() => {
+    window.portrait.yaw = Math.PI / 6;
+    window.__arena.sync([window.portrait], "viewer");
+  });
+  await page.waitForTimeout(800);
+  await page.screenshot({
+    path: "artifacts/character-hands.png",
+    clip: { x: 380, y: 100, width: 680, height: 850 },
+  });
+  await page.evaluate(() => {
+    const view = window.__arena;
+    window.portrait.yaw = -Math.PI / 2;
+    view.sync([window.portrait], "viewer");
+    const frame = Object.getPrototypeOf(view).frame.bind(view);
+    view.frame = (dt) => {
+      frame(
+        dt,
+        0,
+        { x: -25.3, y: -0.38, z: 6, vy: 0 },
+        Math.PI / 2,
+        -0.12,
+        false,
+        false,
+      );
+      view.context.weapon.root.visible = false;
+      view.context.render.frame(dt);
+    };
+  });
+  await page.waitForTimeout(800);
+  await page.screenshot({
+    path: "artifacts/character-sunlit.png",
+    clip: { x: 380, y: 100, width: 680, height: 850 },
+  });
   const animation = await page.evaluate(() => {
     const view = window.__arena,
       actor = view.actors.get("portrait");
@@ -116,6 +149,7 @@ try {
   const metrics = await page.evaluate(() => {
     const actor = window.__arena.actors.get("portrait");
     const model = {
+      reusedHands: actor.userData.reusedFirstPersonHands,
       meshes: 0,
       triangles: 0,
       bodyColors: [],
@@ -141,6 +175,7 @@ try {
   });
   assert.ok(metrics.triangles > 20000);
   assert.equal(metrics.skinned, 1);
+  assert.equal(metrics.reusedHands, 3);
   assert.ok(metrics.bones >= 10);
   assert.ok(metrics.materialGroups <= 12);
   assert.ok(
@@ -151,6 +186,7 @@ try {
   console.log(
     JSON.stringify(
       {
+        reusedHands: metrics.reusedHands,
         meshes: metrics.meshes,
         bones: metrics.bones,
         materialGroups: metrics.materialGroups,

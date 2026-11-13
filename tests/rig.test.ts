@@ -73,3 +73,33 @@ test("mirrored armor retains its exterior winding after geometry baking", () => 
   mesh.geometry.dispose();
   material.dispose();
 });
+
+test("reused glove surfaces retain smooth normals through transformed skin baking", () => {
+  const source = new THREE.Group();
+  const material = new THREE.MeshStandardMaterial();
+  const geometry = new THREE.SphereGeometry(1, 12, 8);
+  const glove = new THREE.Mesh(geometry, material);
+  glove.userData.preserveNormals = true;
+  glove.rotation.set(0.3, -0.2, 0.7);
+  glove.scale.set(0.2, 0.3, 0.1);
+  source.add(glove);
+  source.updateMatrixWorld(true);
+  const expected = geometry.toNonIndexed();
+  expected.applyMatrix4(glove.matrixWorld);
+  const baked = skinRigidHierarchy(source);
+  const mesh = baked.getObjectByName("operator-shell") as THREE.SkinnedMesh;
+  const normals = mesh.geometry.getAttribute("normal");
+  const original = expected.getAttribute("normal");
+  for (let i = 0; i < normals.count; i++) {
+    assert.ok(
+      new THREE.Vector3()
+        .fromBufferAttribute(normals, i)
+        .distanceTo(new THREE.Vector3().fromBufferAttribute(original, i)) <
+        1e-6,
+    );
+  }
+  expected.dispose();
+  mesh.geometry.dispose();
+  mesh.skeleton.dispose();
+  material.dispose();
+});

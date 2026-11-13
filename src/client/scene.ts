@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { CharacterFactory } from "./character";
+import { CharacterFactory } from "./soldier";
 import { RULES, WORLD_SEED, WORLD_COLLIDERS } from "../shared/config";
 import { createPhysics } from "../shared/original/physics.js";
 import { groundAt } from "../shared/physics";
@@ -166,7 +166,7 @@ export class ArenaView {
     context.weapon = await createWeapon(context);
     context.weapon.debug.noFire = true;
     context.weapon.setVisible(false);
-    view.characters = new CharacterFactory(context.mats);
+    view.characters = new CharacterFactory(context.mats, context.weapon.root);
     progress("正在编译原版场景着色器…");
     await context.render.onLevelReady();
     return view;

@@ -45,7 +45,8 @@ export function skinRigidHierarchy(source: THREE.Group): THREE.Group {
       geometry.dispose();
       geometry = reflected;
     }
-    geometry.computeVertexNormals();
+    if (!node.userData.preserveNormals || !geometry.getAttribute("normal"))
+      geometry.computeVertexNormals();
     const count = geometry.attributes.position.count;
     const colors = new Float32Array(count * 3),
       joints = new Uint16Array(count * 4),
