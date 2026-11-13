@@ -1,4 +1,4 @@
-// Generated from 几猫国产3A大作_V1.html by scripts/extract-original.mjs.
+// Generated from csf国产3A大作_V1.html by scripts/extract-original.mjs.
 // Preserve original shaders and geometry; adapt gameplay in the typed client layer.
 import * as lt from 'three';
 const {Vector3:W} = lt;

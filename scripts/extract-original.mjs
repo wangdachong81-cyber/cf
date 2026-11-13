@@ -5,7 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import ts from "typescript";
 import { transform } from "esbuild";
-const html = fs.readFileSync("几猫国产3A大作_V1.html", "utf8");
+const html = fs.readFileSync("csf国产3A大作_V1.html", "utf8");
 const original = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const pretty = (
   await transform(original, {
@@ -129,7 +129,7 @@ function emit(filename, roots, effects = false) {
     if (!s) throw Error(root);
     include(s);
   }
-  const code = `// Generated from 几猫国产3A大作_V1.html by scripts/extract-original.mjs.\n// Preserve original shaders and geometry; adapt gameplay in the typed client layer.\nimport * as lt from 'three';\nconst {${[...imports].map(([alias, name]) => `${name}:${alias}`).join(",")}} = lt;\n${sf.statements
+  const code = `// Generated from csf国产3A大作_V1.html by scripts/extract-original.mjs.\n// Preserve original shaders and geometry; adapt gameplay in the typed client layer.\nimport * as lt from 'three';\nconst {${[...imports].map(([alias, name]) => `${name}:${alias}`).join(",")}} = lt;\n${sf.statements
     .filter((s) => needed.has(s))
     .map((s) => s.getText(sf))
     .join("\n")}\nexport {${Object.entries(roots)
