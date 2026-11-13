@@ -10,7 +10,8 @@
     "test": "tsx --test tests/*.test.ts",
     "check": "tsc --noEmit",
     "import:original": "node scripts/extract-original.mjs && node scripts/bake-original-map.mjs",
-    "test:browser": "tsx scripts/verify-browser.mjs"
+    "test:browser": "tsx scripts/verify-browser.mjs",
+    "test:character": "node scripts/verify-character.mjs"
   },
   "dependencies": {
     "three": "0.180.0",

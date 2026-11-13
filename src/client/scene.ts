@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { CharacterFactory } from "./character";
 import { RULES, WORLD_SEED, WORLD_COLLIDERS } from "../shared/config";
 import { createPhysics } from "../shared/original/physics.js";
 import { groundAt } from "../shared/physics";
@@ -76,7 +77,7 @@ export class ArenaView {
   private previousPosition = new THREE.Vector3();
   private renderPosition = new THREE.Vector3();
   private wasPlaying = false;
-  private rifleTemplate!: THREE.Group;
+  private characters!: CharacterFactory;
   private constructor(private context: Context) {}
   get renderer() {
     return this.context.renderer;
@@ -165,7 +166,7 @@ export class ArenaView {
     context.weapon = await createWeapon(context);
     context.weapon.debug.noFire = true;
     context.weapon.setVisible(false);
-    view.rifleTemplate = context.weapon.root.clone(true);
+    view.characters = new CharacterFactory();
     progress("正在编译原版场景着色器…");
     await context.render.onLevelReady();
     return view;
@@ -183,124 +184,12 @@ export class ArenaView {
       this.context.weapon.reset();
     this.local = player;
   }
-  private createActor(color: string) {
-    const ctx = this.context,
-      actor = new THREE.Group();
-    const cloth = ctx.mats.get("glove_fabric", { triplanar: true });
-    const armor = ctx.mats.get("polymer_black", { triplanar: true });
-    const metal = ctx.mats.get("anodized_black", { triplanar: true });
-    const mark = new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.5,
-      emissive: color,
-      emissiveIntensity: 0.1,
-    });
-    const part = (
-      geometry: THREE.BufferGeometry,
-      mat: THREE.Material,
-      x: number,
-      y: number,
-      z: number,
-      parent: THREE.Object3D = actor,
-    ) => {
-      const mesh = new THREE.Mesh(geometry, mat);
-      mesh.position.set(x, y, z);
-      mesh.castShadow = mesh.receiveShadow = true;
-      parent.add(mesh);
-      return mesh;
-    };
-    part(new THREE.CapsuleGeometry(0.235, 0.43, 6, 12), cloth, 0, 1.09, 0);
-    part(new THREE.BoxGeometry(0.43, 0.38, 0.13), armor, 0, 1.15, -0.18);
-    part(new THREE.BoxGeometry(0.38, 0.4, 0.14), armor, 0, 1.14, 0.18);
-    for (const side of [-1, 1]) {
-      const leg = new THREE.Group();
-      leg.position.set(side * 0.14, 0.72, 0);
-      actor.add(leg);
-      part(
-        new THREE.CapsuleGeometry(0.105, 0.43, 5, 10),
-        cloth,
-        0,
-        -0.27,
-        0,
-        leg,
-      );
-      part(new THREE.BoxGeometry(0.15, 0.17, 0.09), armor, 0, -0.33, -0.1, leg);
-      part(
-        new THREE.BoxGeometry(0.17, 0.17, 0.29),
-        armor,
-        0,
-        -0.65,
-        -0.04,
-        leg,
-      );
-      part(
-        new THREE.CapsuleGeometry(0.1, 0.19, 5, 10),
-        cloth,
-        side * 0.29,
-        1.24,
-        0,
-      );
-      part(
-        new THREE.CapsuleGeometry(0.11, 0.07, 4, 10),
-        armor,
-        side * 0.28,
-        1.37,
-        0,
-      );
-      part(
-        new THREE.BoxGeometry(0.11, 0.07, 0.16),
-        mark,
-        side * 0.31,
-        1.27,
-        -0.01,
-      );
-      actor.userData[side === -1 ? "leftLeg" : "rightLeg"] = leg;
-    }
-    part(new THREE.SphereGeometry(0.18, 16, 12), armor, 0, 1.66, 0);
-    part(new THREE.CapsuleGeometry(0.12, 0.1, 5, 12), cloth, 0, 1.48, -0.01);
-    part(new THREE.BoxGeometry(0.27, 0.095, 0.06), metal, 0, 1.65, -0.16);
-    part(new THREE.BoxGeometry(0.19, 0.04, 0.015), mark, 0, 1.65, -0.195);
-    for (let i = -1; i <= 1; i++)
-      part(
-        new THREE.BoxGeometry(0.095, 0.15, 0.06),
-        armor,
-        i * 0.115,
-        1.05,
-        -0.265,
-      );
-    const rifle = this.rifleTemplate.clone(true);
-    rifle.position.set(0.13, 1.31, -0.035);
-    rifle.rotation.set(0, 0, 0);
-    rifle.visible = true;
-    rifle.traverse((object) => {
-      object.layers.set(0);
-      if (object instanceof THREE.Mesh) {
-        object.castShadow = true;
-        object.receiveShadow = true;
-        const material = object.material as THREE.ShaderMaterial;
-        if (material.isShaderMaterial && material.uniforms.uInt)
-          object.visible = false;
-      }
-    });
-    actor.add(rifle);
-    const protection = part(
-      new THREE.TorusGeometry(0.54, 0.018, 6, 40),
-      mark,
-      0,
-      0.025,
-      0,
-    );
-    protection.rotation.x = Math.PI / 2;
-    actor.userData.protection = protection;
-    actor.userData.phase = Math.random() * Math.PI * 2;
-    return actor;
-  }
   sync(players: Player[], self: string) {
     for (const player of players) {
       if (player.id === self) continue;
       let actor = this.actors.get(player.id);
       if (!actor) {
-        actor = this.createActor(player.color);
+        actor = this.characters.create(player.color);
         actor.position.set(player.x, player.y, player.z);
         this.actors.set(player.id, actor);
         this.scene.add(actor);
@@ -308,22 +197,15 @@ export class ArenaView {
       actor.visible = player.health > 0;
       actor.userData.target = new THREE.Vector3(player.x, player.y, player.z);
       actor.userData.yaw = player.yaw;
+      actor.userData.pitch = player.pitch;
+      actor.userData.airborne = Math.abs(player.vy) > 0.1;
+      actor.userData.reloading = player.reloadAt > 0;
       actor.userData.protection.visible = player.protectedUntil > Date.now();
     }
     for (const [id, actor] of this.actors)
       if (!players.some((p) => p.id === id)) {
         this.scene.remove(actor);
-        // Rifle geometry/materials are shared with the original viewmodel.
-        const owned = actor.children.filter(
-          (child) =>
-            child !== actor.children.find((c) => c.name === "viewmodel-pac9"),
-        );
-        for (const child of owned)
-          child.traverse((object) => {
-            if (object instanceof THREE.Mesh) object.geometry.dispose();
-          });
-        const protection = actor.userData.protection as THREE.Mesh;
-        (protection.material as THREE.Material).dispose();
+        this.characters.release(actor);
         this.actors.delete(id);
       }
   }
@@ -449,6 +331,7 @@ export class ArenaView {
     this.camera.updateProjectionMatrix();
     for (const actor of this.actors.values()) {
       const target = actor.userData.target as THREE.Vector3;
+      const previous = actor.position.clone();
       const distance = actor.position.distanceTo(target);
       if (distance > 6) actor.position.copy(target);
       else actor.position.lerp(target, 1 - Math.exp(-dt * 18));
@@ -457,10 +340,21 @@ export class ArenaView {
         Math.cos(actor.userData.yaw - actor.rotation.y),
       );
       actor.rotation.y += diff * Math.min(1, dt * 18);
-      actor.userData.phase += dt * (distance > 0.03 ? 11 : 0);
-      const swing = distance > 0.03 ? Math.sin(actor.userData.phase) * 0.35 : 0;
-      actor.userData.leftLeg.rotation.x = swing;
-      actor.userData.rightLeg.rotation.x = -swing;
+      const speed =
+        distance > 6
+          ? 0
+          : Math.min(
+              RULES.sprintSpeed,
+              actor.position.distanceTo(previous) / Math.max(0.001, dt),
+            );
+      this.characters.update(
+        actor,
+        dt,
+        speed,
+        actor.userData.pitch,
+        actor.userData.airborne,
+        actor.userData.reloading,
+      );
     }
     ctx.fx.update(dt);
     ctx.ground.update(dt);
